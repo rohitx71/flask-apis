@@ -11,37 +11,48 @@ from flask_jwt_extended import (
 )
 from blacklist import BLACKLIST
 
+BLANK_ERROR = "'{}' cannot be blank."
+USER_NOT_FOUND = 'User not found'
+USER_ALREADY_EXISTS = "A user with name '{}' already exists."
+USER_CREATED = "User created successfully"
+USER_DELETED = "User deleted successfully"
+INSERTION_ERROR = "An error occurred inserting the item."
+SUCCESSFULLY_LOGGED_OUT = "Successfully logged out"
+INVALID_CREDENTIALS = "Invalid credentials"
+
 _user_parser = reqparse.RequestParser()
-_user_parser.add_argument("username", type=str, required=True, help="This field cannot be left blank")
-_user_parser.add_argument("password", type=str, required=True, help="This field cannot be left blank")
+_user_parser.add_argument("username", type=str, required=True, help=BLANK_ERROR.format("username"))
+_user_parser.add_argument("password", type=str, required=True, help=BLANK_ERROR.format("password"))
 
 
 class UserRegister(Resource):
-	def post(self):
+
+	@classmethod
+	def post(cls):
 		data = _user_parser.parse_args()
 		user = UserModel.find_by_username(data["username"])
 		if user:
-			return {"message": "Username already exists!"}, 400
+			return {"message": USER_ALREADY_EXISTS.format(data["username"])}, 400
 		UserModel(**data).save_to_db()
-		return {"message": "User created successfully"}, 201
+		return {"message": USER_CREATED}, 201
 
 
 class User(Resource):
 
 	@classmethod
-	def get(cls, user_id):
+	def get(cls, user_id: int):
 		user = UserModel.find_by_id(user_id)
 		if not user:
-			return {"message": "User not found!"}, 400
+			return {"message": USER_NOT_FOUND}, 400
 		return user.json()
 
 	@classmethod
-	def delete(cls, user_id):
+	def delete(cls, user_id: int):
 		user = UserModel.find_by_id(user_id)
 		if not user:
-			return {"message": "User not found!"}, 400
+			return {"message": USER_NOT_FOUND}, 400
 		user.delete_from_db()
-		return {"message": "User deleted"}
+		return {"message": USER_DELETED}
 
 
 class UserLogin(Resource):
@@ -58,22 +69,24 @@ class UserLogin(Resource):
 				'refresh_token': refresh_token
 			}
 
-		return {"message": "Invalid credentials"}, 401
+		return {"message": INVALID_CREDENTIALS}, 401
 
 
 class UserLogout(Resource):
 
+	@classmethod
 	@jwt_required
-	def post(self):
+	def post(cls):
 		jti = get_raw_jwt()['jti']  # JWT ID
 		BLACKLIST.add(jti)
-		return {"message": "Successfully logged out"}, 200
+		return {"message": SUCCESSFULLY_LOGGED_OUT}, 200
 
 
 class TokenRefresh(Resource):
 
+	@classmethod
 	@jwt_refresh_token_required
-	def post(self):
+	def post(cls):
 		current_user = get_jwt_identity()
 		new_token = create_access_token(identity=current_user, fresh=False)
 		return {'access_token': new_token}
